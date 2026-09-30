@@ -22,10 +22,20 @@ pybind11 生成的是普通 Python 扩展模块（`.so`）。Python 里 `import`
 
 `step1` 的名字是 `example`，`step2` 的名字是 `toy_matrix`，`step3` 的名字是 `gpu_vector`。编译结果类似 `example.cpython-311-x86_64-linux-gnu.so`，中间的 `cpython-311` 由当前 Python 版本决定。换了一个 Python，就要用那个 Python 重新配置并编译。
 
-pybind11 的源码只放一份，在仓库根目录的 `extern/pybind11`。三个 step 都不再各自带一份。这份源码不进 Git。新克隆仓库后，先在根目录准备好它：
+pybind11 的源码只放一份，在仓库根目录的 `extern/pybind11`。它是一个 Git 子模块：本仓库只记录 pybind11 的地址和当前要用的那一次提交，源码文件本身留在 [pybind11](https://github.com/pybind/pybind11) 那边。
+
+在别的机器上先克隆本仓库，再把子模块拉下来：
 
 ```bash
-git clone --depth 1 https://github.com/pybind/pybind11.git extern/pybind11
+git clone git@github.com:yzyz-ch/pybind_test.git
+cd pybind_test
+git submodule update --init
+```
+
+`git submodule` 本身只是查看状态，不会下载。`update --init` 才会按记录的地址把 pybind11 克隆到 `extern/pybind11`。也可以在克隆时一次做完：
+
+```bash
+git clone --recurse-submodules git@github.com:yzyz-ch/pybind_test.git
 ```
 
 路径写在 `cmake/use_pybind11.cmake` 的 `PYBIND11_DIR`。每个 step 的 `CMakeLists.txt` 只有一行：
