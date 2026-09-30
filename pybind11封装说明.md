@@ -12,7 +12,7 @@ pybind11 生成的是普通 Python 扩展模块（`.so`）。Python 里 `import`
 | --- | --- | --- |
 | 实现 | 纯 C++ 或 CUDA，不包含 pybind11 | `step2/matrix.h`、`step2/matrix.cpp` |
 | 绑定 | 只负责把已有函数、类登记给 Python | `step1/example.cpp`、`step2/bind.cpp` |
-| 构建 | `pybind11_add_module` 编出 `.so` | 两个目录的 `CMakeLists.txt` |
+| 构建 | `pybind11_add_module` 编出 `.so` | 三个 step 的 `CMakeLists.txt` |
 
 模块名必须三处一致：
 
@@ -20,7 +20,25 @@ pybind11 生成的是普通 Python 扩展模块（`.so`）。Python 里 `import`
 2. `pybind11_add_module(名字 ...)` 的目标名
 3. Python 里 `import 名字`
 
-`step1` 的名字是 `example`，`step2` 的名字是 `toy_matrix`。编译结果类似 `example.cpython-311-x86_64-linux-gnu.so`，中间的 `cpython-311` 由当前 Python 版本决定。换了一个 Python，就要用那个 Python 重新配置并编译。
+`step1` 的名字是 `example`，`step2` 的名字是 `toy_matrix`，`step3` 的名字是 `gpu_vector`。编译结果类似 `example.cpython-311-x86_64-linux-gnu.so`，中间的 `cpython-311` 由当前 Python 版本决定。换了一个 Python，就要用那个 Python 重新配置并编译。
+
+pybind11 的源码只放一份，在仓库根目录的 `extern/pybind11`。三个 step 都不再各自带一份。这份源码不进 Git。新克隆仓库后，先在根目录准备好它：
+
+```bash
+git clone --depth 1 https://github.com/pybind/pybind11.git extern/pybind11
+```
+
+路径写在 `cmake/use_pybind11.cmake` 的 `PYBIND11_DIR`。每个 step 的 `CMakeLists.txt` 只有一行：
+
+```cmake
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/use_pybind11.cmake)
+```
+
+源码在 step 目录外面，`add_subdirectory` 必须同时给出编译输出目录，这个文件里已经写好了。想改用另一份 pybind11，改 `PYBIND11_DIR`，或者配置时覆盖：
+
+```bash
+cmake -DPYBIND11_DIR=/path/to/pybind11 ..
+```
 
 ## step1：绑定一个函数
 
@@ -47,11 +65,11 @@ PYBIND11_MODULE(example, m) {
 cmake_minimum_required(VERSION 3.5)
 project(example)
 
-add_subdirectory(extern/pybind11)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/use_pybind11.cmake)
 pybind11_add_module(example example.cpp)
 ```
 
-`add_subdirectory(extern/pybind11)` 引入随仓库带的 pybind11。`pybind11_add_module` 会编一个 Python 扩展模块，并链上 Python 和 pybind11，不要改成普通的 `add_library`。
+`include(...)` 会按 `cmake/use_pybind11.cmake` 里的路径引入那一份共用的 pybind11。`pybind11_add_module` 会编一个 Python 扩展模块，并链上 Python 和 pybind11，不要改成普通的 `add_library`。
 
 编译和调用。下面的 `python3` 必须是 CMake 找到的那一个（本机是 `/home/shawn/anaconda3/bin/python3`，3.11.7）：
 
@@ -109,7 +127,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-add_subdirectory(extern/pybind11)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/use_pybind11.cmake)
 
 add_executable(TestMatrix main.cpp matrix.cpp)
 pybind11_add_module(toy_matrix bind.cpp matrix.cpp)
@@ -180,7 +198,7 @@ Python 只跟调度员说话。
 | `bind.cpp` | 前台登记处 | 把类和方法的名字告诉 Python。这里不写计算公式 |
 | `CMakeLists.txt` | 怎么把它们编到一起 | `.cu` 交给 nvcc，`bind.cpp` 交给 g++，最后打成一个 `.so` |
 
-`extern/pybind11` 是指向 `step2/extern/pybind11` 的符号链接，step3 没有再复制一份 pybind11。
+step3 同样通过 `cmake/use_pybind11.cmake` 使用仓库根目录那一份 pybind11，自己的目录里没有 pybind11 源码。
 
 类里真正保存的只有两样东西：显存地址 `data_`，以及长度 `n_`。Python 看不到 `data_`，只能通过方法使用这块显存。
 
